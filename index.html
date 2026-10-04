@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Get Together - 聚會卡牌互動網站</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'Noto Sans TC', 'sans-serif'],
+                    },
+                    colors: {
+                        mode: {
+                            know: '#3b82f6',    // Know Your Friends - Blue
+                            new: '#10b981',     // Make New Friends - Emerald
+                            tod: '#f59e0b',     // Truth or Dare - Amber/Orange
+                            couple: '#ec4899',  // Couples - Pink
+                        },
+                        darkbg: '#0b0d19',
+                    },
+                    boxShadow: {
+                        'neon-blue': '0 0 25px rgba(59, 130, 246, 0.5)',
+                        'neon-emerald': '0 0 25px rgba(16, 185, 129, 0.5)',
+                        'neon-amber': '0 0 25px rgba(245, 158, 11, 0.5)',
+                        'neon-pink': '0 0 25px rgba(236, 72, 153, 0.5)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0b0d19;
+            color: #f3f4f6;
+            background-image: 
+                radial-gradient(circle at 15% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 45%),
+                radial-gradient(circle at 85% 80%, rgba(236, 72, 153, 0.15) 0%, transparent 45%),
+                radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.1) 0%, transparent 50%);
+            background-attachment: fixed;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .glass-panel {
+            background: rgba(22, 25, 43, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        /* 3D Card Flip Effects */
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+        
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+
+        .card-inner.is-flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 1.25rem;
+        }
+
+        .card-back {
+            transform: rotateY(180deg);
+        }
+
+        /* Discard Slide-out Animation */
+        @keyframes discardSlide {
+            0% {
+                opacity: 1;
+                transform: scale(1) translateY(0) rotate(0deg);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0.6) translateY(-180px) rotate(25deg);
+            }
+        }
+
+        .animate-discard {
+            animation: discardSlide 0.5s forwards ease-in-out;
+        }
+
+        /* Mode Theme Overrides */
+        body[data-theme="know"] {
+            --theme-color: #3b82f6;
+            --theme-shadow: rgba(59, 130, 246, 0.4);
+        }
+        body[data-theme="new"] {
+            --theme-color: #10b981;
+            --theme-shadow: rgba(16, 185, 129, 0.4);
+        }
+        body[data-theme="tod"] {
+            --theme-color: #f59e0b;
+            --theme-shadow: rgba(245, 158, 11, 0.4);
+        }
+        body[data-theme="couple"] {
+            --theme-color: #ec4899;
+            --theme-shadow: rgba(236, 72, 153, 0.4);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0b0d19; }
+        ::-webkit-scrollbar-thumb { background: #2a2e45; border-radius: 10px; }
+    </style>
+</head>
+<body data-theme="know" class="min-h-screen flex flex-col justify-between font-sans antialiased text-gray-100 overflow-x-hidden">
+
+    <!-- GLOBAL HEADER / TOP BAR -->
+    <header class="sticky top-0 z-40 glass-panel border-b border-gray-800/80 px-4 py-3 sm:px-8">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="goToPage(1)">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
+                    <i class="fa-solid fa-layer-group text-white text-lg"></i>
+                </div>
+                <span class="text-2xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400">
+                    Get Together
+                </span>
+            </div>
+
+            <!-- Header Quick Actions -->
+            <div class="flex items-center space-x-3">
+                <!-- User Status Display -->
+                <div id="userBadge" class="hidden items-center space-x-2 px-3 py-1.5 rounded-xl glass-card text-xs font-semibold text-gray-300">
+                    <i class="fa-solid fa-circle-user text-indigo-400 text-sm"></i>
+                    <span id="userBadgeText">遊客</span>
+                </div>
+
+                <!-- Sound Toggle -->
+                <button onclick="toggleSound()" id="soundBtn" class="p-2.5 rounded-xl glass-panel text-gray-300 hover:text-white transition-all">
+                    <i class="fa-solid fa-volume-high text-lg" id="soundIcon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN PAGES CONTAINER -->
+    <main class="max-w-5xl mx-auto px-4 py-6 w-full flex-grow flex flex-col justify-center">
+
+        <!-- ================= PAGE 1: HOME / INTRODUCTION ================= -->
+        <section id="page-1" class="page-view space-y-8 text-center animate-fadeIn my-auto">
+            <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold tracking-widest uppercase">
+                <i class="fa-solid fa-sparkles text-yellow-400"></i> 聚會破冰必備互動卡牌
+            </div>
+
+            <div class="space-y-4 max-w-2xl mx-auto">
+                <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-tight">
+                    讓每一次聚會 <br>
+                    都充滿<span class="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-pink-400 to-amber-300">深度對話與歡笑</span>
+                </h1>
+                <p class="text-gray-400 text-base sm:text-lg leading-relaxed">
+                    專為朋友派對、新朋友破冰、深度交流與情侶互動打造的線上卡牌箱。一人一疊專屬 50 張精選卡牌，點擊翻開問題，輕鬆帶動全場氣氛！
+                </p>
+            </div>
+
+            <!-- Features Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto pt-4 text-left">
+                <div class="glass-card p-4 rounded-2xl border border-gray-800">
+                    <i class="fa-solid fa-users text-indigo-400 text-2xl mb-2"></i>
+                    <h4 class="font-bold text-sm text-white">4 大話題模式</h4>
+                    <p class="text-xs text-gray-400 mt-1">涵蓋好友、破冰、真心話與情侶</p>
+                </div>
+                <div class="glass-card p-4 rounded-2xl border border-gray-800">
+                    <i class="fa-solid fa-cubes text-emerald-400 text-2xl mb-2"></i>
+                    <h4 class="font-bold text-sm text-white">獨立 50 張牌堆</h4>
+                    <p class="text-xs text-gray-400 mt-1">依人數公平分堆，輪流抽牌</p>
+                </div>
+                <div class="glass-card p-4 rounded-2xl border border-gray-800">
+                    <i class="fa-solid fa-floppy-disk text-amber-400 text-2xl mb-2"></i>
+                    <h4 class="font-bold text-sm text-white">隨時暫停存檔</h4>
+                    <p class="text-xs text-gray-400 mt-1">支援本地帳號進度隨時續玩</p>
+                </div>
+                <div class="glass-card p-4 rounded-2xl border border-gray-800">
+                    <i class="fa-solid fa-wand-magic-sparkles text-pink-400 text-2xl mb-2"></i>
+                    <h4 class="font-bold text-sm text-white">精美擬真動效</h4>
+                    <p class="text-xs text-gray-400 mt-1">3D 翻牌與流暢廢牌動畫</p>
+                </div>
+            </div>
+
+            <!-- Main CTA Button -->
+            <div class="pt-6">
+                <button onclick="goToPage(2)" class="px-10 py-5 rounded-2xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-black text-xl shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300">
+                    點擊進入遊戲 <i class="fa-solid fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- ================= PAGE 2: ACCOUNT / GUEST LOGIN ================= -->
+        <section id="page-2" class="page-view hidden space-y-6 max-w-md mx-auto my-auto w-full">
+            <div class="text-center space-y-2">
+                <h2 class="text-3xl font-extrabold text-white">選擇登入方式</h2>
+                <p class="text-xs text-gray-400">建立本地帳號可保存遊戲進度與自訂數據</p>
+            </div>
+
+            <div class="glass-panel p-6 sm:p-8 rounded-3xl space-y-6 border border-gray-800">
+                <!-- Auth Tabs Switch -->
+                <div class="grid grid-cols-2 p-1 bg-gray-900/80 rounded-xl border border-gray-800 text-sm font-semibold">
+                    <button id="tabAuthLogin" onclick="switchAuthTab('login')" class="py-2 rounded-lg bg-indigo-600 text-white transition">登入 / 註冊</button>
+                    <button id="tabAuthGuest" onclick="switchAuthTab('guest')" class="py-2 rounded-lg text-gray-400 hover:text-white transition">遊客模式</button>
+                </div>
+
+                <!-- Account / Password Form -->
+                <div id="authFormSection" class="space-y-4">
+                    <div class="space-y-1">
+                        <label class="text-xs text-gray-400 font-medium">帳號名稱</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-user absolute left-3.5 top-3.5 text-gray-500 text-sm"></i>
+                            <input type="text" id="authUsername" placeholder="請輸入自訂帳號" class="w-full bg-gray-900/90 border border-gray-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs text-gray-400 font-medium">密碼</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-gray-500 text-sm"></i>
+                            <input type="password" id="authPassword" placeholder="請輸入密碼" class="w-full bg-gray-900/90 border border-gray-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                        </div>
+                    </div>
+
+                    <p class="text-[11px] text-indigo-300/80 flex items-center">
+                        <i class="fa-solid fa-circle-info mr-1.5"></i> 免綁定 Google/Email，帳密完全存於本機 LocalStorage。
+                    </p>
+
+                    <button onclick="handleAccountAuth()" class="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 transition">
+                        確認登入 / 自動建立帳號
+                    </button>
+                </div>
+
+                <!-- Guest Section -->
+                <div id="guestFormSection" class="hidden space-y-5 text-center">
+                    <div class="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs text-left leading-relaxed">
+                        <i class="fa-solid fa-triangle-exclamation font-bold mr-1"></i> <strong>遊客模式提示：</strong><br>
+                        選擇遊客模式時，網頁關閉將不會保留存檔與遊戲進度。若有未完成的局數將無法恢復。
+                    </div>
+
+                    <button onclick="handleGuestAuth()" class="w-full py-3.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-bold text-sm border border-gray-700 transition">
+                        以遊客身份直接開始
+                    </button>
+                </div>
+            </div>
+
+            <!-- Saved Games Quick Resume Bar (if logged in) -->
+            <div id="savedGamePrompt" class="hidden p-4 glass-card rounded-2xl border border-indigo-500/40 flex items-center justify-between">
+                <div>
+                    <span class="text-xs text-indigo-400 font-bold block">偵測到上次存檔</span>
+                    <span id="savedGameDetails" class="text-xs text-gray-300">模式: -- | 玩家: --</span>
+                </div>
+                <button onclick="loadSavedGame()" class="px-3 py-1.5 rounded-lg bg-indigo-500 text-white text-xs font-bold shadow hover:bg-indigo-400 transition">
+                    讀取存檔
+                </button>
+            </div>
+        </section>
+
+        <!-- ================= PAGE 3: MODE SELECTION ================= -->
+        <section id="page-3" class="page-view hidden space-y-6 my-auto">
+            <div class="flex items-center justify-between">
+                <button onclick="goToPage(2)" class="text-xs text-gray-400 hover:text-white flex items-center space-x-1.5">
+                    <i class="fa-solid fa-arrow-left"></i> <span>返回上頁</span>
+                </button>
+                <span class="text-xs font-bold text-gray-400">Step 1 / 2：選擇模式</span>
+            </div>
+
+            <div class="text-center space-y-2">
+                <h2 class="text-3xl font-extrabold text-white">選擇遊戲話題模式</h2>
+                <p class="text-xs text-gray-400">挑選適合今天聚會情境的卡牌主題</p>
+            </div>
+
+            <!-- Mode Cards Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
+                <!-- Mode 1: Know Your Friends -->
+                <div onclick="selectMode('know')" class="group cursor-pointer glass-panel p-6 rounded-3xl border border-gray-800 hover:border-blue-500 transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-14 h-14 rounded-2xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400 text-2xl group-hover:scale-110 transition">
+                            <i class="fa-solid fa-user-group"></i>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-extrabold tracking-widest text-blue-400 uppercase">熟人深度</span>
+                            <h3 class="text-xl font-bold text-white">Know Your Friends</h3>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-4 leading-relaxed">
+                        了解好友！適合相識已久的老朋友，挖出藏在心底的爆笑回憶與真實看法。
+                    </p>
+                </div>
+
+                <!-- Mode 2: Make New Friends -->
+                <div onclick="selectMode('new')" class="group cursor-pointer glass-panel p-6 rounded-3xl border border-gray-800 hover:border-emerald-500 transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-2xl group-hover:scale-110 transition">
+                            <i class="fa-solid fa-handshake"></i>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-extrabold tracking-widest text-emerald-400 uppercase">破冰熱身</span>
+                            <h3 class="text-xl font-bold text-white">Make New Friends</h3>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-4 leading-relaxed">
+                        破冰交友！輕鬆有趣的輕度話題，打破初次見面的尷尬，快速拉近距離。
+                    </p>
+                </div>
+
+                <!-- Mode 3: Truth or Dare -->
+                <div onclick="selectMode('tod')" class="group cursor-pointer glass-panel p-6 rounded-3xl border border-gray-800 hover:border-amber-500 transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-2xl group-hover:scale-110 transition">
+                            <i class="fa-solid fa-fire-flame-curved"></i>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-extrabold tracking-widest text-amber-400 uppercase">刺激派對</span>
+                            <h3 class="text-xl font-bold text-white">Truth or Dare</h3>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-4 leading-relaxed">
+                        真心話大冒險！充滿挑戰性的互動與搞怪任務，全場嗨翻天的最佳選擇。
+                    </p>
+                </div>
+
+                <!-- Mode 4: Couples -->
+                <div onclick="selectMode('couple')" class="group cursor-pointer glass-panel p-6 rounded-3xl border border-gray-800 hover:border-pink-500 transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-14 h-14 rounded-2xl bg-pink-500/20 border border-pink-500/40 flex items-center justify-center text-pink-400 text-2xl group-hover:scale-110 transition">
+                            <i class="fa-solid fa-heart"></i>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-extrabold tracking-widest text-pink-400 uppercase">雙人甜密</span>
+                            <h3 class="text-xl font-bold text-white">Couples</h3>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-4 leading-relaxed">
+                        情侶專屬！增進兩人世界感情的親密問答與甜蜜考驗（預設 2 人直升遊戲）。
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PAGE 4: PLAYER COUNT SELECTION ================= -->
+        <section id="page-4" class="page-view hidden space-y-6 max-w-lg mx-auto my-auto w-full">
+            <div class="flex items-center justify-between">
+                <button onclick="goToPage(3)" class="text-xs text-gray-400 hover:text-white flex items-center space-x-1.5">
+                    <i class="fa-solid fa-arrow-left"></i> <span>重選模式</span>
+                </button>
+                <span class="text-xs font-bold text-gray-400">Step 2 / 2：選擇人數</span>
+            </div>
+
+            <div class="text-center space-y-2">
+                <h2 class="text-3xl font-extrabold text-white">聚會人數有多少人？</h2>
+                <p class="text-xs text-gray-400">系統將為每位玩家建立獨立的 50 張專屬卡牌堆</p>
+            </div>
+
+            <div class="glass-panel p-6 rounded-3xl space-y-6 border border-gray-800">
+                <!-- Player Count Selector Grid -->
+                <div class="grid grid-cols-3 gap-3">
+                    <button onclick="setPlayerCount(2)" class="btn-player-cnt p-4 rounded-2xl glass-card border border-gray-700 hover:border-indigo-500 text-center transition">
+                        <span class="block text-2xl font-black text-white">2 人</span>
+                    </button>
+                    <button onclick="setPlayerCount(3)" class="btn-player-cnt p-4 rounded-2xl glass-card border border-gray-700 hover:border-indigo-500 text-center transition">
+                        <span class="block text-2xl font-black text-white">3 人</span>
+                    </button>
+                    <button onclick="setPlayerCount(4)" class="btn-player-cnt p-4 rounded-2xl glass-card border border-gray-700 hover:border-indigo-500 text-center transition">
+                        <span class="block text-2xl font-black text-white">4 人</span>
+                    </button>
+                    <button onclick="setPlayerCount(5)" class="btn-player-cnt p-4 rounded-2xl glass-card border border-gray-700 hover:border-indigo-500 text-center transition">
+                        <span class="block text-2xl font-black text-white">5 人</span>
+                    </button>
+                    <button onclick="setPlayerCount(6)" class="btn-player-cnt p-4 rounded-2xl glass-card border border-gray-700 hover:border-indigo-500 text-center transition">
+                        <span class="block text-2xl font-black text-white">6 人</span>
+                    </button>
+                    <button onclick="setPlayerCount(8)" class="btn-player-cnt p-4 rounded-2xl glass-card border border-gray-700 hover:border-indigo-500 text-center transition">
+                        <span class="block text-2xl font-black text-white">8 人</span>
+                    </button>
+                </div>
+
+                <button onclick="startGameWithConfig()" class="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-pink-500 text-white font-black text-lg shadow-xl hover:scale-105 active:scale-95 transition">
+                    準備好了，開始發牌！ <i class="fa-solid fa-play ml-2"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- ================= PAGE 5: GAME BOARD ================= -->
+        <section id="page-5" class="page-view hidden space-y-6 my-auto">
+            <!-- Game Top Status Bar -->
+            <div class="flex items-center justify-between glass-panel px-5 py-3 rounded-2xl border border-gray-800">
+                <div class="flex items-center space-x-3">
+                    <span id="gameModeBadge" class="px-3 py-1 rounded-full text-xs font-black uppercase bg-blue-500/20 text-blue-400 border border-blue-500/40">
+                        Know Your Friends
+                    </span>
+                    <span class="text-xs text-gray-400 font-medium hidden sm:inline-block">
+                        目前輪到：<strong id="turnPlayerText" class="text-white font-bold">玩家 1</strong>
+                    </span>
+                </div>
+
+                <!-- Pause / Menu Button -->
+                <button onclick="openPauseModal()" class="px-4 py-1.5 rounded-xl bg-gray-800/90 hover:bg-gray-700 text-gray-200 text-xs font-bold border border-gray-700 flex items-center space-x-2 transition">
+                    <i class="fa-solid fa-pause"></i> <span>暫停 / 選單</span>
+                </button>
+            </div>
+
+            <!-- Decks Grid Container -->
+            <div id="decksContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
+                <!-- Dynamically generated player deck cards -->
+            </div>
+        </section>
+
+        <!-- ================= PAGE 6: GAME OVER SUMMARY ================= -->
+        <section id="page-6" class="page-view hidden space-y-6 max-w-md mx-auto my-auto text-center">
+            <div class="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-tr from-amber-400 to-pink-500 flex items-center justify-center text-white text-3xl shadow-2xl animate-bounce">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+
+            <div class="space-y-2">
+                <h2 class="text-3xl font-black text-white">卡牌已全部抽完！</h2>
+                <p class="text-xs text-gray-400">所有玩家的 50 張卡牌均已解答完畢。希望你們度過了美好的聚會時光！</p>
+            </div>
+
+            <div class="glass-panel p-6 rounded-3xl border border-gray-800 space-y-4">
+                <div class="p-4 rounded-2xl bg-gray-900/80 border border-gray-800 text-left space-y-2">
+                    <div class="flex justify-between text-xs">
+                        <span class="text-gray-400">總消耗卡牌：</span>
+                        <span id="summaryTotalCards" class="text-white font-bold">100 張</span>
+                    </div>
+                    <div class="flex justify-between text-xs">
+                        <span class="text-gray-400">參賽人數：</span>
+                        <span id="summaryPlayers" class="text-white font-bold">2 人</span>
+                    </div>
+                </div>
+
+                <div class="space-y-3 pt-2">
+                    <button onclick="restartGameSameConfig()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold text-sm shadow-lg hover:scale-105 transition">
+                        <i class="fa-solid fa-rotate-right mr-2"></i> 重新遊玩（隨機洗牌）
+                    </button>
+                    <button onclick="goToPage(3)" class="w-full py-3.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold text-sm border border-gray-700 transition">
+                        <i class="fa-solid fa-house mr-2"></i> 返回模式選單
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- PAUSE / MENU MODAL -->
+    <div id="pauseModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-panel max-w-sm w-full rounded-3xl p-6 border border-gray-700 space-y-5 text-center animate-scaleUp">
+            <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-circle-pause"></i>
+            </div>
+
+            <div class="space-y-1">
+                <h3 class="text-xl font-bold text-white">遊戲暫停</h3>
+                <p class="text-xs text-gray-400">請選擇接下來的操作</p>
+            </div>
+
+            <div class="space-y-3">
+                <button onclick="saveAndExitGame()" class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-md transition">
+                    <i class="fa-solid fa-floppy-disk mr-1.5"></i> 儲存遊戲並退出
+                </button>
+                <button onclick="exitWithoutSave()" class="w-full py-3 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 font-bold text-sm border border-red-500/30 transition">
+                    <i class="fa-solid fa-arrow-right-from-bracket mr-1.5"></i> 直接退出（不儲存）
+                </button>
+                <button onclick="closePauseModal()" class="w-full py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-sm transition">
+                    繼續遊戲
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="text-center text-xs text-gray-500 py-4 border-t border-gray-800/50 max-w-5xl mx-auto w-full px-4">
+        Get Together &copy; 2026 - 聚會卡牌互動網站
+    </footer>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        /* ================= WEB AUDIO SYNTHESIZER ================= */
+        let audioCtx = null;
+        let isAudioMuted = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            if (isAudioMuted) return;
+            initAudio();
+            if (!audioCtx) return;
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'click') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(500, now);
+                osc.frequency.exponentialRampToValueAtTime(200, now + 0.04);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.04);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.04);
+            } else if (type === 'flip') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.08);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            } else if (type === 'discard') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(150, now + 0.12);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.12);
+            }
+        }
+
+        function toggleSound() {
+            isAudioMuted = !isAudioMuted;
+            const icon = document.getElementById('soundIcon');
+            icon.className = isAudioMuted ? 'fa-solid fa-volume-xmark text-gray-500' : 'fa-solid fa-volume-high text-indigo-400';
+            if (!isAudioMuted) playSound('click');
+        }
+
+        /* ================= QUESTION DATABASES (50+ cards per mode) ================= */
+        const QUESTION_BANK = {
+            know: [
+                "在現場所有人中，你覺得誰最不容易被打敗？為什麼？",
+                "分享一個你曾經做過最荒謬但沒人知道的事情。",
+                "如果你現在可以立刻獲得一個技能，你會選擇什麼？",
+                "在場哪一位朋友的第一印象跟你現在的了解反差最大？",
+                "你覺得自己性格中最值得驕傲的一個優點是什麼？",
+                "上一次讓你發自內心大笑的事情是什麼？",
+                "如果只能選擇現場一個人陪你困在荒島一星期，你會選誰？",
+                "你人生中到目前為止買過最浪費錢的東西是什麼？",
+                "你最希望五年後的自己處於什麼樣的狀態？",
+                "分享一個你曾經遭遇過最尷尬的社交場面。",
+                "如果可以回到過去改變一個決定，你會選擇哪件事？",
+                "你覺得好友關係中最不能觸碰的底線是什麼？",
+                "在場誰的擇偶條件或眼光你覺得最奇特？",
+                "你最受不了別人哪一種生活習慣？",
+                "分享一次你曾經勇敢做出的重要冒險。"
+            ],
+            new: [
+                "如果今天晚上不用考慮預算，你最想吃什麼美食？",
+                "你平時最喜歡的放鬆方式或休閒嗜好是什麼？",
+                "推薦一部你覺得大家一生一定要看一次的電影或劇集。",
+                "你最近一次去旅行的地方是哪裡？有什麼有趣的事嗎？",
+                "你是晨型人還是夜貓子？最喜歡一天的哪個時段？",
+                "如果可以立刻飛往世界上任何一個城市，你想去哪？",
+                "你小時候長大後的夢想職業是什麼？",
+                "手機裡你最常用的一個 App 是哪一個？",
+                "你覺得自己是貓派、狗派還是其他寵物派？",
+                "分享一個你的隱藏特長或奇特的小技能。",
+                "你最喜歡的季節是哪一個？理由是什麼？",
+                "如果可以用一個詞形容你自己，你會用哪個詞？",
+                "你有沒有任何堅持的怪癖或堅持的小儀式？",
+                "你聽過最打動你的一句名言或歌詞是什麼？"
+            ],
+            tod: [
+                "【真心話】說出現場你覺得顏值最高的人，並給出理由。",
+                "【大冒險】用最浮誇的語氣現場朗誦一段購物發票或商品標籤。",
+                "【真心話】你上一次說謊是什麼時候？因為什麼事？",
+                "【大冒險】讓右邊的朋友為你指定一個搞笑的社群動態內容並發布。",
+                "【真心話】手機相冊裡倒數第 3 張照片是什麼？展示給大家看。",
+                "【大冒險】學一種動物的叫聲與動作，直到全場一致通過才合格。",
+                "【真心話】你覺得在場誰最可能是隱藏的富豪或有錢人？",
+                "【大冒險】現場模仿一位大家共同認識的名人或朋友。",
+                "【真心話】你曾經暗戀過朋友的另一半或前任嗎？",
+                "【大冒險】深情對視左邊的朋友 10 秒鐘，期間絕對不能笑。",
+                "【真心話】分享你手機瀏覽紀錄裡最奇葩的一條搜尋紀錄。",
+                "【大冒險】現場做 10 個標準深蹲，邊做邊誇獎自己很帥/很美。"
+            ],
+            couple: [
+                "第一次見到對方時，你心裡的真實想法是什麼？",
+                "對方做過最讓你感動的一件事是什麼？",
+                "如果可以一起去度假一週，你最想去哪裡？",
+                "你覺得我們之間最相似的地方和最不同的地方是什麼？",
+                "對方哪一個小動作或習慣會讓你覺得特別可愛？",
+                "分享一個你最喜歡我們一起度過的特別紀念日。",
+                "你覺得在我們這段關係中，自己獲得最大成長的是什麼？",
+                "如果用一種食物來形容對方，你會選擇什麼？",
+                "你希望我們在未來一年內共同完成的一個目標是什麼？",
+                "當對方生氣時，你覺得最有效的安撫方式是什麼？",
+                "請說出三個你最欣賞對方的內在特質。"
+            ]
+        };
+
+        // Helper to generate a 50-card deck by shuffling and repeating base pool
+        function generate50CardDeck(modeKey) {
+            const base = QUESTION_BANK[modeKey] || QUESTION_BANK['know'];
+            let deck = [];
+            while (deck.length < 50) {
+                const shuffled = [...base].sort(() => 0.5 - Math.random());
+                deck = deck.concat(shuffled);
+            }
+            return deck.slice(0, 50);
+        }
+
+        /* ================= GLOBAL STATE ================= */
+        let currentPage = 1;
+        let currentUser = null; // null = guest, or string username
+        let selectedMode = 'know';
+        let playerCount = 2;
+        let activeGameState = null; // { mode, playerCount, playerDecks: [[card1,...], ...], currentTurn: 0 }
+
+        /* ================= PAGE NAVIGATION ================= */
+        function goToPage(pageNum) {
+            playSound('click');
+            currentPage = pageNum;
+            document.querySelectorAll('.page-view').forEach(el => el.classList.add('hidden'));
+            const target = document.getElementById(`page-${pageNum}`);
+            if (target) target.classList.remove('hidden');
+
+            // Apply theme styling to body
+            document.body.setAttribute('data-theme', selectedMode);
+        }
+
+        /* ================= PAGE 2: AUTH LOGIC ================= */
+        function switchAuthTab(tab) {
+            playSound('click');
+            const loginBtn = document.getElementById('tabAuthLogin');
+            const guestBtn = document.getElementById('tabAuthGuest');
+            const formSec = document.getElementById('authFormSection');
+            const guestSec = document.getElementById('guestFormSection');
+
+            if (tab === 'login') {
+                loginBtn.className = 'py-2 rounded-lg bg-indigo-600 text-white transition';
+                guestBtn.className = 'py-2 rounded-lg text-gray-400 hover:text-white transition';
+                formSec.classList.remove('hidden');
+                guestSec.classList.add('hidden');
+            } else {
+                guestBtn.className = 'py-2 rounded-lg bg-indigo-600 text-white transition';
+                loginBtn.className = 'py-2 rounded-lg text-gray-400 hover:text-white transition';
+                guestSec.classList.remove('hidden');
+                formSec.classList.add('hidden');
+            }
+        }
+
+        function handleAccountAuth() {
+            const userVal = document.getElementById('authUsername').value.trim();
+            const passVal = document.getElementById('authPassword').value.trim();
+
+            if (!userVal || !passVal) {
+                alert('請輸入帳號與密碼！');
+                return;
+            }
+
+            // Simple LocalStorage account authentication simulator
+            const savedUser = localStorage.getItem(`gt_user_${userVal}`);
+            if (savedUser) {
+                const parsed = JSON.parse(savedUser);
+                if (parsed.password !== passVal) {
+                    alert('密碼不正確，請重新輸入！');
+                    return;
+                }
+            } else {
+                // Register new user
+                localStorage.setItem(`gt_user_${userVal}`, JSON.stringify({ password: passVal }));
+            }
+
+            currentUser = userVal;
+            updateUserBadge();
+            checkSavedGames();
+            goToPage(3);
+        }
+
+        function handleGuestAuth() {
+            currentUser = null;
+            updateUserBadge();
+            goToPage(3);
+        }
+
+        function updateUserBadge() {
+            const badge = document.getElementById('userBadge');
+            const badgeText = document.getElementById('userBadgeText');
+            badge.classList.remove('hidden');
+            badge.classList.add('flex');
+            badgeText.innerText = currentUser ? currentUser : '遊客模式';
+        }
+
+        function checkSavedGames() {
+            if (!currentUser) return;
+            const saved = localStorage.getItem(`gt_save_${currentUser}`);
+            const prompt = document.getElementById('savedGamePrompt');
+            if (saved) {
+                const data = JSON.parse(saved);
+                document.getElementById('savedGameDetails').innerText = `模式: ${data.mode.toUpperCase()} | 玩家: ${data.playerCount} 人`;
+                prompt.classList.remove('hidden');
+            } else {
+                prompt.classList.add('hidden');
+            }
+        }
+
+        function loadSavedGame() {
+            if (!currentUser) return;
+            const saved = localStorage.getItem(`gt_save_${currentUser}`);
+            if (saved) {
+                activeGameState = JSON.parse(saved);
+                selectedMode = activeGameState.mode;
+                playerCount = activeGameState.playerCount;
+                renderGameBoard();
+                goToPage(5);
+            }
+        }
+
+        /* ================= PAGE 3 & 4: MODE & PLAYERS ================= */
+        function selectMode(mode) {
+            playSound('click');
+            selectedMode = mode;
+            document.body.setAttribute('data-theme', mode);
+
+            if (mode === 'couple') {
+                playerCount = 2;
+                startGameWithConfig();
+            } else {
+                goToPage(4);
+            }
+        }
+
+        function setPlayerCount(count) {
+            playSound('click');
+            playerCount = count;
+            document.querySelectorAll('.btn-player-cnt').forEach(btn => {
+                btn.classList.remove('border-indigo-500', 'bg-indigo-500/20');
+            });
+            event.currentTarget.classList.add('border-indigo-500', 'bg-indigo-500/20');
+        }
+
+        function startGameWithConfig() {
+            playSound('click');
+            // Build new active game state
+            const playerDecks = [];
+            for (let i = 0; i < playerCount; i++) {
+                playerDecks.push(generate50CardDeck(selectedMode));
+            }
+
+            activeGameState = {
+                mode: selectedMode,
+                playerCount: playerCount,
+                playerDecks: playerDecks,
+                currentTurn: 0,
+                // Track card state per deck: { flipped: false }
+                deckStates: Array(playerCount).fill().map(() => ({ flipped: false }))
+            };
+
+            renderGameBoard();
+            goToPage(5);
+        }
+
+        /* ================= PAGE 5: GAME BOARD LOGIC ================= */
+        function renderGameBoard() {
+            const container = document.getElementById('decksContainer');
+            container.innerHTML = '';
+
+            const modeNames = {
+                know: 'Know Your Friends',
+                new: 'Make New Friends',
+                tod: 'Truth or Dare',
+                couple: 'Couples'
+            };
+            document.getElementById('gameModeBadge').innerText = modeNames[activeGameState.mode];
+            document.getElementById('turnPlayerText').innerText = `玩家 ${activeGameState.currentTurn + 1}`;
+
+            activeGameState.playerDecks.forEach((deck, pIdx) => {
+                const remainingCount = deck.length;
+                const isCurrentTurn = (pIdx === activeGameState.currentTurn);
+                const deckState = activeGameState.deckStates[pIdx];
+
+                const cardHtml = `
+                    <div class="glass-panel p-5 rounded-3xl border border-gray-800 space-y-4 relative ${isCurrentTurn ? 'ring-2 ring-indigo-500/80 shadow-lg' : 'opacity-85'} transition-all">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-bold text-white flex items-center">
+                                <i class="fa-solid fa-user-circle mr-1.5 text-indigo-400"></i> 玩家 ${pIdx + 1}
+                            </span>
+                            <span class="px-2.5 py-0.5 rounded-full bg-gray-800 text-gray-300 font-bold">
+                                剩餘 ${remainingCount} / 50 張
+                            </span>
+                        </div>
+
+                        <!-- Card 3D Flip Container -->
+                        <div class="perspective-1000 w-full h-64 cursor-pointer" onclick="handleCardClick(${pIdx})">
+                            <div id="cardInner-${pIdx}" class="card-inner ${deckState.flipped ? 'is-flipped' : ''}">
+                                
+                                <!-- FRONT (COVER) -->
+                                <div class="card-front glass-card border border-indigo-500/30 rounded-2xl flex flex-col justify-between p-6 bg-gradient-to-br from-gray-900/90 to-indigo-950/50 shadow-xl">
+                                    <div class="flex justify-between items-center text-indigo-400 text-sm">
+                                        <i class="fa-solid fa-layer-group"></i>
+                                        <span class="text-[10px] font-black tracking-widest uppercase">GET TOGETHER</span>
+                                    </div>
+                                    <div class="text-center my-auto">
+                                        <i class="fa-solid fa-touch-app text-3xl text-indigo-400/60 animate-bounce mb-2"></i>
+                                        <p class="text-sm font-bold text-gray-200">點擊翻開卡牌</p>
+                                    </div>
+                                    <div class="text-right text-[10px] text-gray-500">
+                                        Card Stack #${pIdx + 1}
+                                    </div>
+                                </div>
+
+                                <!-- BACK (QUESTION) -->
+                                <div class="card-back glass-card border border-pink-500/40 rounded-2xl flex flex-col justify-between p-6 bg-gradient-to-br from-gray-900/90 to-purple-950/60 shadow-xl">
+                                    <div class="flex justify-between items-center text-pink-400 text-xs">
+                                        <span class="font-bold"><i class="fa-solid fa-circle-question mr-1"></i> 問題內容</span>
+                                        <span class="text-[10px] text-gray-400">再次點擊廢牌</span>
+                                    </div>
+                                    <div class="text-center my-auto px-2">
+                                        <p class="text-base sm:text-lg font-extrabold text-white leading-relaxed">
+                                            ${remainingCount > 0 ? deck[remainingCount - 1] : '卡牌已抽完'}
+                                        </p>
+                                    </div>
+                                    <div class="text-center text-[10px] text-gray-400 border-t border-gray-800/80 pt-2">
+                                        解答完成後，再次點擊進廢牌堆
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += cardHtml;
+            });
+        }
+
+        function handleCardClick(pIdx) {
+            if (!activeGameState) return;
+
+            const deck = activeGameState.playerDecks[pIdx];
+            if (deck.length === 0) return;
+
+            const deckState = activeGameState.deckStates[pIdx];
+            const cardInner = document.getElementById(`cardInner-${pIdx}`);
+
+            if (!deckState.flipped) {
+                // First Click: Flip card to show question
+                playSound('flip');
+                deckState.flipped = true;
+                if (cardInner) cardInner.classList.add('is-flipped');
+            } else {
+                // Second Click: Animate into discard pile and remove card
+                playSound('discard');
+                if (cardInner) cardInner.classList.add('animate-discard');
+
+                setTimeout(() => {
+                    // Remove current top card
+                    activeGameState.playerDecks[pIdx].pop();
+                    deckState.flipped = false;
+
+                    // Rotate to next turn
+                    activeGameState.currentTurn = (activeGameState.currentTurn + 1) % activeGameState.playerCount;
+
+                    // Check if all cards exhausted
+                    const totalRemaining = activeGameState.playerDecks.reduce((sum, d) => sum + d.length, 0);
+                    if (totalRemaining === 0) {
+                        endGameSummary();
+                    } else {
+                        renderGameBoard();
+                    }
+                }, 450);
+            }
+        }
+
+        /* ================= PAUSE & SAVE MODAL ================= */
+        function openPauseModal() {
+            playSound('click');
+            document.getElementById('pauseModal').classList.remove('hidden');
+        }
+
+        function closePauseModal() {
+            playSound('click');
+            document.getElementById('pauseModal').classList.add('hidden');
+        }
+
+        function saveAndExitGame() {
+            playSound('click');
+            if (currentUser && activeGameState) {
+                localStorage.setItem(`gt_save_${currentUser}`, JSON.stringify(activeGameState));
+                alert('已成功儲存進度！下次登入可繼續遊玩。');
+            } else {
+                alert('遊客模式不支援存檔，進度已重置。');
+            }
+            closePauseModal();
+            goToPage(3);
+        }
+
+        function exitWithoutSave() {
+            playSound('click');
+            closePauseModal();
+            goToPage(3);
+        }
+
+        /* ================= PAGE 6: END GAME SUMMARY ================= */
+        function endGameSummary() {
+            playSound('click');
+            confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+
+            const total = activeGameState.playerCount * 50;
+            document.getElementById('summaryTotalCards').innerText = `${total} 張`;
+            document.getElementById('summaryPlayers').innerText = `${activeGameState.playerCount} 人`;
+
+            // Clear saved game for user if completed
+            if (currentUser) {
+                localStorage.removeItem(`gt_save_${currentUser}`);
+            }
+
+            goToPage(6);
+        }
+
+        function restartGameSameConfig() {
+            playSound('click');
+            startGameWithConfig();
+        }
+
+        /* ================= INITIALIZATION ================= */
+        window.onload = function() {
+            goToPage(1);
+        };
+    </script>
+</body>
+</html>
